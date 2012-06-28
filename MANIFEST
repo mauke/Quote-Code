@@ -1,0 +1,9 @@
+Changes
+lib/Quote/Code.pm
+Makefile.PL
+MANIFEST
+README
+Code.xs
+t/00-load.t
+t/01-bare.t
+t/pod.t
