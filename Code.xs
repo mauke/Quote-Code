@@ -77,7 +77,7 @@ static void free_ptr_op(pTHX_ void *vp) {
 	Safefree(pp);
 }
 
-static void missing_terminator(I32 c) {
+static void missing_terminator(pTHX_ I32 c) {
 	SV *sv;
 	sv = sv_2mortal(newSVpvs("'\"'"));
 	if (c != '"') {
@@ -90,13 +90,13 @@ static void missing_terminator(I32 c) {
 	croak("Can't find string terminator %"SVf" anywhere before EOF", SVfARG(sv));
 }
 
-static void my_sv_cat_c(SV *sv, U32 c) {
-	#if 0
+static void my_sv_cat_c(pTHX_ SV *sv, U32 c) {
 	char ds[UTF8_MAXBYTES + 1], *d;
 	d = uvchr_to_utf8(ds, c);
+	if (d - ds > 1) {
+		sv_utf8_upgrade(sv);
+	}
 	sv_catpvn(sv, ds, d - ds);
-	#endif
-	sv_catpvf(sv, "%c", c);
 }
 
 static U32 hex2int(unsigned char c) {
@@ -148,7 +148,7 @@ static void parse_qc(pTHX_ OP **op_ptr) {
 	for (;;) {
 		c = lex_read_unichar(0);
 		if (c == -1) {
-			missing_terminator(delim_stop);
+			missing_terminator(aTHX_ delim_stop);
 		}
 
 		if (c == '{') {
@@ -193,7 +193,7 @@ static void parse_qc(pTHX_ OP **op_ptr) {
 			c = lex_read_unichar(0);
 			switch (c) {
 				case -1:
-					missing_terminator(delim_stop);
+					missing_terminator(aTHX_ delim_stop);
 
 				case 'a': c = '\a'; break;
 				case 'b': c = '\b'; break;
@@ -206,7 +206,7 @@ static void parse_qc(pTHX_ OP **op_ptr) {
 				case 'c':
 					c = lex_read_unichar(0);
 					if (c == -1) {
-						missing_terminator(delim_stop);
+						missing_terminator(aTHX_ delim_stop);
 					}
 					c = toUPPER(c) ^ 64;
 					break;
@@ -273,7 +273,7 @@ static void parse_qc(pTHX_ OP **op_ptr) {
 			}
 		}
 
-		my_sv_cat_c(sv, c);
+		my_sv_cat_c(aTHX_ sv, c);
 	}
 
 	if (SvCUR(sv) || !*gen_sentinel) {
