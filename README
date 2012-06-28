@@ -1,6 +1,6 @@
-Defaults-Mauke
+Quote-Code
 
-Load a few generally useful modules to save typing.
+quoted strings with arbitrary code interpolation
 
 
 INSTALLATION
@@ -17,25 +17,29 @@ SUPPORT AND DOCUMENTATION
 After installing, you can find documentation for this module with the
 perldoc command.
 
-    perldoc Defaults::Mauke
+    perldoc Quote::Code
 
 You can also look for information at:
 
     RT, CPAN's request tracker
-        http://rt.cpan.org/NoAuth/Bugs.html?Dist=Defaults-Mauke
+        http://rt.cpan.org/NoAuth/Bugs.html?Dist=Quote-Code
 
     AnnoCPAN, Annotated CPAN documentation
-        http://annocpan.org/dist/Defaults-Mauke
+        http://annocpan.org/dist/Quote-Code
 
     CPAN Ratings
-        http://cpanratings.perl.org/d/Defaults-Mauke
+        http://cpanratings.perl.org/d/Quote-Code
 
     Search CPAN
-        http://search.cpan.org/dist/Defaults-Mauke/
+        http://search.cpan.org/dist/Quote-Code/
 
 
 COPYRIGHT AND LICENCE
 
-Written by Lukas Mai, 2009-2011.
+Written by Lukas Mai, 2012.
 
-I put this code in the public domain. Do whatever you want with it.
+This program is free software; you can redistribute it and/or modify it
+under the terms of either: the GNU General Public License as published
+by the Free Software Foundation; or the Artistic License.
+
+See http://dev.perl.org/licenses/ for more information.
