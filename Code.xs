@@ -78,10 +78,10 @@ static void free_ptr_op(pTHX_ void *vp) {
 }
 
 static void missing_terminator(I32 c) {
-	char utf8_tmp[UTF8_MAXBYTES + 1], *d;
 	SV *sv;
 	sv = sv_2mortal(newSVpvs("'\"'"));
 	if (c != '"') {
+		char utf8_tmp[UTF8_MAXBYTES + 1], *d;
 		d = uvchr_to_utf8(utf8_tmp, c);
 		pv_uni_display(sv, utf8_tmp, d - utf8_tmp, 100, UNI_DISPLAY_QQ);
 		sv_insert(sv, 0, 0, "\"", 1);
@@ -91,9 +91,12 @@ static void missing_terminator(I32 c) {
 }
 
 static void my_sv_cat_c(SV *sv, U32 c) {
+	#if 0
 	char ds[UTF8_MAXBYTES + 1], *d;
 	d = uvchr_to_utf8(ds, c);
 	sv_catpvn(sv, ds, d - ds);
+	#endif
+	sv_catpvf(sv, "%c", c);
 }
 
 static U32 hex2int(unsigned char c) {
@@ -240,7 +243,8 @@ static void parse_qc(pTHX_ OP **op_ptr) {
 						c = u;
 					} else if (isXDIGIT(c)) {
 						u = hex2int(c);
-						while (c = lex_peek_unichar(0), isXDIGIT(c)) {
+						c = lex_peek_unichar(0);
+						if (isXDIGIT(c)) {
 							u = u * 16 + hex2int(c);
 							lex_read_unichar(0);
 						}
@@ -288,7 +292,10 @@ static void parse_qc(pTHX_ OP **op_ptr) {
 		if (gen->op_type == OP_CONST) {
 			SvPOK_only_UTF8(((SVOP *)gen)->op_sv);
 		} else if (gen->op_type != OP_CONCAT) {
-			gen = newUNOP(OP_STRINGIFY, 0, gen);
+			/* can't do this because B::Deparse dies on it:
+			 * gen = newUNOP(OP_STRINGIFY, 0, gen);
+			 */
+			gen = newBINOP(OP_CONCAT, 0, gen, newSVOP(OP_CONST, 0, newSVpvs("")));
 		}
 
 		*op_ptr = gen;
