@@ -47,12 +47,15 @@ Quote::Code - quoted strings with arbitrary code interpolation
 
 This module provides the new keyword C<qc>.
 C<qc> is a quoting operator like L<q or qq|perlop/Quote-and-Quote-like-Operators>.
-It works like C<q> in that it doesn't interpolate C<$foo> or C<@foo>, and like
-C<qq> in that it does recognize backslash escapes such as C<\n>, C<\xff>, etc.
+It works like C<q> in that it doesn't interpolate C<$foo> or C<@foo>, but like
+C<qq> in that it recognizes backslash escapes such as C<\n>, C<\xff>, etc.
 
 What it adds is the ability to embed arbitrary expressions in braces
 (C<{...}>). This is both more readable and more efficient than the old C<"foo
 @{[bar]}"> L<trick|perlfaq4/How-do-I-expand-function-calls-in-a-string->.
+
+If you need a literal C<{> in a C<qc> string, you can escape it with a backslash
+(C<\{>) or interpolate code that yields a left brace (C<{'{'}>).
 
 =head1 BUGS
 
