@@ -6,4 +6,5 @@ README
 Code.xs
 t/00-load.t
 t/01-bare.t
+t/02-unload.t
 t/pod.t

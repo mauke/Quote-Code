@@ -302,12 +302,26 @@ static void parse_qc(pTHX_ OP **op_ptr) {
 	}
 }
 
+static int qc_enabled(pTHX) {
+	HV *hints;
+	SV *sv, **psv;
+
+	if (!(hints = GvHV(PL_hintgv))) {
+		return FALSE;
+	}
+	if (!(psv = hv_fetchs(hints, HINTK_QC, 0))) {
+		return FALSE;
+	}
+	sv = *psv;
+	return SvTRUE(sv);
+}
+
 static int my_keyword_plugin(pTHX_ char *keyword_ptr, STRLEN keyword_len, OP **op_ptr) {
 	int ret;
 
 	SAVETMPS;
 
-	if (keyword_len == 2 && keyword_ptr[0] == 'q' && keyword_ptr[1] == 'c') {
+	if (keyword_len == 2 && keyword_ptr[0] == 'q' && keyword_ptr[1] == 'c' && qc_enabled(aTHX)) {
 		parse_qc(aTHX_ op_ptr);
 		ret = KEYWORD_PLUGIN_EXPR;
 	} else {

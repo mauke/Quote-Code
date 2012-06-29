@@ -1,4 +1,4 @@
-use warnings;
+use warnings FATAL => 'all';
 use strict;
 
 use Test::More tests => 11;
