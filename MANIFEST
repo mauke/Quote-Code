@@ -7,4 +7,5 @@ Code.xs
 t/00-load.t
 t/01-bare.t
 t/02-unload.t
+t/03-context.t
 t/pod.t

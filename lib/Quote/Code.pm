@@ -52,7 +52,8 @@ C<qq> in that it recognizes backslash escapes such as C<\n>, C<\xff>, etc.
 
 What it adds is the ability to embed arbitrary expressions in braces
 (C<{...}>). This is both more readable and more efficient than the old C<"foo
-@{[bar]}"> L<trick|perlfaq4/How-do-I-expand-function-calls-in-a-string->.
+@{[bar]}"> L<trick|perlfaq4/How-do-I-expand-function-calls-in-a-string->. All
+embedded code runs in scalar context.
 
 If you need a literal C<{> in a C<qc> string, you can escape it with a backslash
 (C<\{>) or interpolate code that yields a left brace (C<{'{'}>).
