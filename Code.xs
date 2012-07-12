@@ -49,6 +49,7 @@ See http://dev.perl.org/licenses/ for more information.
 
 #include <string.h>
 #include <ctype.h>
+#include <assert.h>
 
 
 WARNINGS_ENABLE
@@ -66,7 +67,8 @@ WARNINGS_ENABLE
 
 #define MY_PKG "Quote::Code"
 
-#define HINTK_QC  MY_PKG "/qc"
+#define HINTK_QC     MY_PKG "/qc"
+#define HINTK_QC_TO  MY_PKG "/qc_to"
 
 
 static int (*next_keyword_plugin)(pTHX_ char *, STRLEN, OP **);
@@ -77,15 +79,32 @@ static void free_ptr_op(pTHX_ void *vp) {
 	Safefree(pp);
 }
 
-static void missing_terminator(pTHX_ I32 c) {
-	SV *sv;
-	sv = sv_2mortal(newSVpvs("'\"'"));
+typedef struct {
+	I32 delim_start, delim_stop;
+	SV *delim_str, *leftover;
+	int backslash_escape, hash_interpolate;
+} QCSpec;
+
+static void missing_terminator(pTHX_ const QCSpec *spec, line_t line) {
+	I32 c = spec->delim_stop;
+	SV *sv = spec->delim_str;
+
+	if (!sv) {
+		sv = sv_2mortal(newSVpvs("'\"'"));
+		if (c != '"') {
+			char utf8_tmp[UTF8_MAXBYTES + 1], *d;
+			d = uvchr_to_utf8(utf8_tmp, c);
+			pv_uni_display(sv, utf8_tmp, d - utf8_tmp, 100, UNI_DISPLAY_QQ);
+		}
+	}
+
 	if (c != '"') {
-		char utf8_tmp[UTF8_MAXBYTES + 1], *d;
-		d = uvchr_to_utf8(utf8_tmp, c);
-		pv_uni_display(sv, utf8_tmp, d - utf8_tmp, 100, UNI_DISPLAY_QQ);
 		sv_insert(sv, 0, 0, "\"", 1);
 		sv_catpvs(sv, "\"");
+	}
+
+	if (line) {
+		CopLINE_set(PL_curcop, line);
 	}
 	croak("Can't find string terminator %"SVf" anywhere before EOF", SVfARG(sv));
 }
@@ -108,33 +127,27 @@ static U32 hex2int(unsigned char c) {
 	return p - xdigits;
 }
 
-static void parse_qc(pTHX_ OP **op_ptr) {
-	I32 c, delim_start, delim_stop;
-	int nesting;
+static void my_op_cat_sv(pTHX_ OP **pop, SV *sv) {
+	OP *const str = newSVOP(OP_CONST, 0, SvREFCNT_inc_simple_NN(sv));
+	*pop = !*pop ? str : newBINOP(OP_CONCAT, 0, *pop, str);
+}
+
+static OP *parse_qctail(pTHX_ const QCSpec *spec) {
+	I32 c;
 	OP **gen_sentinel;
 	SV *sv;
+	int nesting;
+	line_t start;
+	SV *const delim_str = spec->delim_str;
+	const int
+		have_delim_stop = spec->delim_stop != -1;
 
-	c = lex_peek_unichar(0);
+	assert(have_delim_stop != !!delim_str);
+	assert(!delim_str || spec->leftover);
 
-	if (c != '#') {
-		lex_read_space(0);
-		c = lex_peek_unichar(0);
-		if (c == -1) {
-			croak("Unexpected EOF after qc");
-		}
-	}
-	lex_read_unichar(0);
+	start = CopLINE(PL_curcop);
 
-	delim_start = c;
-	delim_stop =
-		c == '(' ? ')' :
-		c == '[' ? ']' :
-		c == '{' ? '}' :
-		c == '<' ? '>' :
-		c
-	;
-
-	nesting = delim_start == delim_stop ? -1 : 0;
+	nesting = have_delim_stop && spec->delim_start != spec->delim_stop ? 0 : -1;
 
 	Newx(gen_sentinel, 1, OP *);
 	*gen_sentinel = NULL;
@@ -144,27 +157,56 @@ static void parse_qc(pTHX_ OP **op_ptr) {
 	if (lex_bufutf8()) {
 		SvUTF8_on(sv);
 	}
+	c = '\n';
 
 	for (;;) {
-		c = lex_read_unichar(0);
+		char *elim;
+		I32 b = c;
+
+		c = lex_peek_unichar(0);
 		if (c == -1) {
-			missing_terminator(aTHX_ delim_stop);
+			missing_terminator(aTHX_ spec, start);
 		}
 
-		if (c == '{') {
+		if (
+			b == '\n' &&
+			delim_str &&
+			/* c == spec->delim_start && */
+			PL_parser->bufend - PL_parser->bufptr >= SvCUR(delim_str) &&
+			(elim = PL_parser->bufptr + SvCUR(delim_str),
+			 memcmp(PL_parser->bufptr, SvPVX(delim_str), SvCUR(delim_str)) == 0) && (
+				!(
+					PL_parser->bufend - PL_parser->bufptr > SvCUR(delim_str) ||
+					lex_next_chunk(0)
+				) ||
+				(elim++, PL_parser->bufptr[SvCUR(delim_str)] == '\n') || (
+					elim++,
+					PL_parser->bufptr[SvCUR(delim_str)] == '\r' &&
+					PL_parser->bufptr[SvCUR(delim_str) + 1] == '\n'
+				)
+			)
+		) {
+			lex_read_to(elim);
+			lex_stuff_sv(spec->leftover, 0);
+			break;
+		}
+
+		if (
+			!spec->hash_interpolate
+				? c == '{'
+				: c == '#' &&
+				  spec->delim_stop != '#' &&
+				  PL_parser->bufptr[1] == '{' &&
+				  (lex_read_unichar(0), 1)
+		) {
 			OP *op;
 
-			lex_stuff_pvs("{", 0);
 			op = parse_block(0);
 			op = newUNOP(OP_NULL, OPf_SPECIAL, op_scope(op));
 
 			if (SvCUR(sv)) {
-				OP *str = newSVOP(OP_CONST, 0, SvREFCNT_inc_simple_NN(sv));
-				if (*gen_sentinel) {
-					*gen_sentinel = newBINOP(OP_CONCAT, 0, *gen_sentinel, str);
-				} else {
-					*gen_sentinel = str;
-				}
+				my_op_cat_sv(aTHX_ gen_sentinel, sv);
+
 				sv = sv_2mortal(newSVpvs(""));
 				if (lex_bufutf8()) {
 					SvUTF8_on(sv);
@@ -177,23 +219,26 @@ static void parse_qc(pTHX_ OP **op_ptr) {
 				*gen_sentinel = op;
 			}
 
+			c = -1;
 			continue;
 		}
 
-		if (nesting != -1 && c == delim_start) {
+		lex_read_unichar(0);
+
+		if (nesting != -1 && c == spec->delim_start) {
 			nesting++;
-		} else if (c == delim_stop) {
+		} else if (have_delim_stop && c == spec->delim_stop) {
 			if (nesting == -1 || nesting == 0) {
 				break;
 			}
 			nesting--;
-		} else if (c == '\\') {
+		} else if (c == '\\' && spec->backslash_escape) {
 			U32 u;
 
 			c = lex_read_unichar(0);
 			switch (c) {
 				case -1:
-					missing_terminator(aTHX_ delim_stop);
+					missing_terminator(aTHX_ spec, start);
 
 				case 'a': c = '\a'; break;
 				case 'b': c = '\b'; break;
@@ -206,7 +251,7 @@ static void parse_qc(pTHX_ OP **op_ptr) {
 				case 'c':
 					c = lex_read_unichar(0);
 					if (c == -1) {
-						missing_terminator(aTHX_ delim_stop);
+						missing_terminator(aTHX_ spec, start);
 					}
 					c = toUPPER(c) ^ 64;
 					break;
@@ -277,12 +322,7 @@ static void parse_qc(pTHX_ OP **op_ptr) {
 	}
 
 	if (SvCUR(sv) || !*gen_sentinel) {
-		OP *str = newSVOP(OP_CONST, 0, SvREFCNT_inc_simple_NN(sv));
-		if (*gen_sentinel) {
-			*gen_sentinel = newBINOP(OP_CONCAT, 0, *gen_sentinel, str);
-		} else {
-			*gen_sentinel = str;
-		}
+		my_op_cat_sv(aTHX_ gen_sentinel, sv);
 	}
 
 	{
@@ -298,31 +338,139 @@ static void parse_qc(pTHX_ OP **op_ptr) {
 			gen = newBINOP(OP_CONCAT, 0, gen, newSVOP(OP_CONST, 0, newSVpvs("")));
 		}
 
-		*op_ptr = gen;
+		return gen;
 	}
 }
 
-static int qc_enabled(pTHX) {
+static void parse_qc(pTHX_ OP **op_ptr) {
+	I32 c, delim_start, delim_stop;
+	int nesting;
+	OP **gen_sentinel;
+	SV *sv;
+
+	c = lex_peek_unichar(0);
+
+	if (c != '#') {
+		lex_read_space(0);
+		c = lex_peek_unichar(0);
+		if (c == -1) {
+			croak("Unexpected EOF after qc");
+		}
+	}
+	lex_read_unichar(0);
+
+	{
+		I32 delim_start = c;
+		I32 delim_stop =
+			c == '(' ? ')' :
+			c == '[' ? ']' :
+			c == '{' ? '}' :
+			c == '<' ? '>' :
+			c
+		;
+		const QCSpec spec = {
+			delim_start, delim_stop,
+			NULL, NULL,
+			1, 0
+		};
+
+		*op_ptr = parse_qctail(aTHX_ &spec);
+	}
+}
+
+static void parse_qc_to(pTHX_ OP **op_ptr) {
+	I32 c, qdelim;
+	SV *delim, *leftover;
+	int backslash_escape;
+	line_t start;
+
+	lex_read_space(0);
+	if (!strnEQ(PL_parser->bufptr, "<<", 2)) {
+		croak("Missing \"<<\" after qc_to");
+	}
+	lex_read_to(PL_parser->bufptr + 2);
+
+	lex_read_space(0);
+	start = CopLINE(PL_curcop);
+	c = lex_peek_unichar(0);
+	switch (c) {
+		case '\'':
+			backslash_escape = 0;
+			break;
+		case '"':
+			backslash_escape = 1;
+			break;
+
+		default:
+			croak("Missing \"'\" or '\"' after qc_to <<");
+	}
+	qdelim = c;
+	lex_read_unichar(0);
+
+	delim = sv_2mortal(newSVpvs(""));
+	if (lex_bufutf8()) {
+		SvUTF8_on(delim);
+	}
+
+	for (;;) {
+		c = lex_read_unichar(0);
+		if (c == -1) {
+			CopLINE_set(PL_curcop, start);
+			croak("Can't find string terminator %s anywhere before EOF", qdelim == '"' ? "'\"'" : "\"'\"");
+		}
+		if (c == qdelim) {
+			break;
+		}
+		my_sv_cat_c(aTHX_ delim, c);
+	}
+
+	{
+		char *fin = memchr(PL_parser->bufptr, '\n', PL_parser->bufend - PL_parser->bufptr);
+		if (fin) {
+			fin++;
+		} else {
+			fin = PL_parser->bufend;
+		}
+
+		leftover = sv_2mortal(newSVpvn_utf8(PL_parser->bufptr, fin - PL_parser->bufptr, lex_bufutf8()));
+		lex_unstuff(fin);
+	}
+
+	{
+		const QCSpec spec = {
+			-1, -1,
+			delim, leftover,
+			qdelim == '"', 1
+		};
+		*op_ptr = parse_qctail(aTHX_ &spec);
+	}
+}
+
+static int qc_enabled(pTHX_ const char *hk_ptr, size_t hk_len) {
 	HV *hints;
 	SV *sv, **psv;
 
 	if (!(hints = GvHV(PL_hintgv))) {
 		return FALSE;
 	}
-	if (!(psv = hv_fetchs(hints, HINTK_QC, 0))) {
+	if (!(psv = hv_fetch(hints, hk_ptr, hk_len, 0))) {
 		return FALSE;
 	}
 	sv = *psv;
 	return SvTRUE(sv);
 }
+#define qc_enableds(S) qc_enabled(aTHX_ "" S "", sizeof (S) - 1)
 
 static int my_keyword_plugin(pTHX_ char *keyword_ptr, STRLEN keyword_len, OP **op_ptr) {
 	int ret;
 
 	SAVETMPS;
 
-	if (keyword_len == 2 && keyword_ptr[0] == 'q' && keyword_ptr[1] == 'c' && qc_enabled(aTHX)) {
+	if (keyword_len == 2 && keyword_ptr[0] == 'q' && keyword_ptr[1] == 'c' && qc_enableds(HINTK_QC)) {
 		parse_qc(aTHX_ op_ptr);
+		ret = KEYWORD_PLUGIN_EXPR;
+	} else if (keyword_len == 5 && memcmp(keyword_ptr, "qc_to", 5) == 0 && qc_enableds(HINTK_QC_TO)) {
+		parse_qc_to(aTHX_ op_ptr);
 		ret = KEYWORD_PLUGIN_EXPR;
 	} else {
 		ret = next_keyword_plugin(aTHX_ keyword_ptr, keyword_len, op_ptr);
@@ -344,6 +492,7 @@ WARNINGS_ENABLE {
 	HV *const stash = gv_stashpvs(MY_PKG, GV_ADD);
 	/**/
 	newCONSTSUB(stash, "HINTK_QC", newSVpvs(HINTK_QC));
+	newCONSTSUB(stash, "HINTK_QC_TO", newSVpvs(HINTK_QC_TO));
 	/**/
 	next_keyword_plugin = PL_keyword_plugin;
 	PL_keyword_plugin = my_keyword_plugin;

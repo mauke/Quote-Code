@@ -13,18 +13,32 @@ BEGIN {
 	XSLoader::load;
 }
 
+my %export = (
+	qc => HINTK_QC,
+	qc_to => HINTK_QC_TO,
+);
+
 sub import {
 	my $class = shift;
-	croak qq{"$_" is not exported by the $class module} for @_;
 
-	$^H{+HINTK_QC} = 1;
+	my @todo;
+	for my $item (@_) {
+		push @todo, $export{$item} || croak qq{"$item" is not exported by the $class module};
+	}
+	for my $item (@todo ? @todo : values %export) {
+		$^H{$item} = 1;
+	}
 }
 
 sub unimport {
 	my $class = shift;
-	croak qq{"$_" is not exported by the $class module} for @_;
-
-	delete $^H{+HINTK_QC};
+	my @todo;
+	for my $item (@_) {
+		push @todo, $export{$item} || croak qq{"$item" is not exported by the $class module};
+	}
+	for my $item (@todo ? @todo : values %export) {
+		delete $^H{$item};
+	}
 }
 
 'ok'
@@ -42,10 +56,20 @@ Quote::Code - quoted strings with arbitrary code interpolation
  use Quote::Code;
  print qc"2 + 2 = {2 + 2}";  # "2 + 2 is 4"
  my $msg = qc{The {$obj->name()} is {$obj->state()}.};
+ 
+ my $heredoc = qc_to <<'EOT';
+ .trigger:hover .message:after {
+   content: "The #{get_adjective()} brown fox #{get_verb()} over the lazy dog.";
+ }
+ EOT
+ print $heredoc;
 
 =head1 DESCRIPTION
 
-This module provides the new keyword C<qc>.
+This module provides the new keywords C<qc> and C<qc_to>.
+
+=head2 qc
+
 C<qc> is a quoting operator like L<q or qq|perlop/Quote-and-Quote-like-Operators>.
 It works like C<q> in that it doesn't interpolate C<$foo> or C<@foo>, but like
 C<qq> in that it recognizes backslash escapes such as C<\n>, C<\xff>, etc.
@@ -57,6 +81,46 @@ embedded code runs in scalar context.
 
 If you need a literal C<{> in a C<qc> string, you can escape it with a backslash
 (C<\{>) or interpolate code that yields a left brace (C<{'{'}>).
+
+=head2 qc_to
+
+For longer strings you can use C<qc_to>, which provides a
+L<heredoc-like|perlop/EOF> syntax. The main difference between C<qc> and
+C<qc_to> is that C<qc_to> uses the Ruby-like C<#{ ... }> to interpolate code
+(not C<{ ... }>). This is because C<{ }> are more common in longer texts and
+escaping them gets annoying.
+
+C<qc_to> has two syntactic forms:
+
+ qc_to <<'FOO'
+ ...
+ FOO
+
+and
+
+ qc_to <<"FOO"
+ ...
+ FOO
+
+After C<qc_to> there must always be a C<E<lt>E<lt>> (this is to give syntax
+highlighters a chance to get things right). After that, there are two
+possibilities:
+
+=over
+
+=item *
+
+An identifier in single quotes. Backslash isn't treated specially in the
+string. To embed a literal C<#{>, you need to write C<#{'#{'}>.
+
+=item *
+
+An identifier in double quotes. Backslash escapes are recognized. You can
+escape C<#{> by writing either C<\#{> or C<#\{>.
+
+=back
+
+Variables aren't interpolated in either case.
 
 =head1 BUGS
 

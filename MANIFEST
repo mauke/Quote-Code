@@ -8,4 +8,7 @@ t/00-load.t
 t/01-bare.t
 t/02-unload.t
 t/03-context.t
+t/04-heredoc.t
+t/05-heredoc-code.t
+t/06-heredoc-code.t
 t/pod.t
