@@ -1,5 +1,8 @@
 Revision history for Quote-Code
 
+0.03    2012-07-12
+        Add qc_to heredoc keyword.
+
 0.02    2012-06-29
         Make sure to enable qc only where Quote::Code is loaded
         instead of globally.
