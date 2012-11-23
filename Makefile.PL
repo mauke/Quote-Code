@@ -23,6 +23,15 @@ WriteMakefile(
     	'Carp' => 0,
     },
     MIN_PERL_VERSION => '5.14.0',
+    META_MERGE => {
+        resources => {
+            repository => {
+                url => 'git://github.com/mauke/Quote-Code.git',
+                web => 'https://github.com/mauke/Quote-Code',
+                type => 'git',
+            },
+        },
+    },
     dist                => { COMPRESS => 'gzip -9f', SUFFIX => 'gz', },
     clean               => { FILES => 'Quote-Code-*' },
 );
