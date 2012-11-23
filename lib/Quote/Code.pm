@@ -3,7 +3,6 @@ package Quote::Code;
 use v5.14.0;
 
 use warnings;
-use strict;
 
 use Carp qw(croak);
 

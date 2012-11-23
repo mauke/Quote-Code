@@ -14,13 +14,13 @@ WriteMakefile(
     LICENSE => 'perl',
     PL_FILES            => {},
     BUILD_REQUIRES => {
+        'strict' => 0,
         'Test::More' => 0,
     },
     PREREQ_PM => {
-        'warnings' => 0,
-        'strict' => 0,
-    	'XSLoader' => 0,
     	'Carp' => 0,
+    	'XSLoader' => 0,
+        'warnings' => 0,
     },
     MIN_PERL_VERSION => '5.14.0',
     META_MERGE => {
