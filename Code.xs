@@ -92,7 +92,7 @@ static void missing_terminator(pTHX_ const QCSpec *spec, line_t line) {
 	if (!sv) {
 		sv = sv_2mortal(newSVpvs("'\"'"));
 		if (c != '"') {
-			char utf8_tmp[UTF8_MAXBYTES + 1], *d;
+			U8 utf8_tmp[UTF8_MAXBYTES + 1], *d;
 			d = uvchr_to_utf8(utf8_tmp, c);
 			pv_uni_display(sv, utf8_tmp, d - utf8_tmp, 100, UNI_DISPLAY_QQ);
 		}
@@ -110,12 +110,12 @@ static void missing_terminator(pTHX_ const QCSpec *spec, line_t line) {
 }
 
 static void my_sv_cat_c(pTHX_ SV *sv, U32 c) {
-	char ds[UTF8_MAXBYTES + 1], *d;
+	U8 ds[UTF8_MAXBYTES + 1], *d;
 	d = uvchr_to_utf8(ds, c);
 	if (d - ds > 1) {
 		sv_utf8_upgrade(sv);
 	}
-	sv_catpvn(sv, ds, d - ds);
+	sv_catpvn(sv, (char *)ds, d - ds);
 }
 
 static U32 hex2int(unsigned char c) {
@@ -168,15 +168,17 @@ static OP *parse_qctail(pTHX_ const QCSpec *spec) {
 			missing_terminator(aTHX_ spec, start);
 		}
 
+		assert(PL_parser->bufend >= PL_parser->bufptr);
+
 		if (
 			b == '\n' &&
 			delim_str &&
 			/* c == spec->delim_start && */
-			PL_parser->bufend - PL_parser->bufptr >= SvCUR(delim_str) &&
+			(STRLEN)(PL_parser->bufend - PL_parser->bufptr) >= SvCUR(delim_str) &&
 			(elim = PL_parser->bufptr + SvCUR(delim_str),
 			 memcmp(PL_parser->bufptr, SvPVX(delim_str), SvCUR(delim_str)) == 0) && (
 				!(
-					PL_parser->bufend - PL_parser->bufptr > SvCUR(delim_str) ||
+					(STRLEN)(PL_parser->bufend - PL_parser->bufptr) > SvCUR(delim_str) ||
 					lex_next_chunk(0)
 				) ||
 				(elim++, PL_parser->bufptr[SvCUR(delim_str)] == '\n') || (
@@ -343,10 +345,7 @@ static OP *parse_qctail(pTHX_ const QCSpec *spec) {
 }
 
 static void parse_qc(pTHX_ OP **op_ptr) {
-	I32 c, delim_start, delim_stop;
-	int nesting;
-	OP **gen_sentinel;
-	SV *sv;
+	I32 c;
 
 	c = lex_peek_unichar(0);
 
@@ -381,7 +380,6 @@ static void parse_qc(pTHX_ OP **op_ptr) {
 static void parse_qc_to(pTHX_ OP **op_ptr) {
 	I32 c, qdelim;
 	SV *delim, *leftover;
-	int backslash_escape;
 	line_t start;
 
 	lex_read_space(0);
@@ -393,16 +391,8 @@ static void parse_qc_to(pTHX_ OP **op_ptr) {
 	lex_read_space(0);
 	start = CopLINE(PL_curcop);
 	c = lex_peek_unichar(0);
-	switch (c) {
-		case '\'':
-			backslash_escape = 0;
-			break;
-		case '"':
-			backslash_escape = 1;
-			break;
-
-		default:
-			croak("Missing \"'\" or '\"' after qc_to <<");
+	if (!(c == '\'' || c == '"')) {
+		croak("Missing \"'\" or '\"' after qc_to <<");
 	}
 	qdelim = c;
 	lex_read_unichar(0);
