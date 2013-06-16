@@ -70,7 +70,6 @@ WARNINGS_ENABLE
 #define HINTK_QC     MY_PKG "/qc"
 #define HINTK_QC_TO  MY_PKG "/qc_to"
 
-
 static int (*next_keyword_plugin)(pTHX_ char *, STRLEN, OP **);
 
 static void free_ptr_op(pTHX_ void *vp) {
@@ -301,6 +300,117 @@ static OP *parse_qctail(pTHX_ const QCSpec *spec) {
 					}
 					break;
 
+				case 'N': {
+					SV *name;
+					char *n_ptr;
+					STRLEN n_len;
+
+					c = lex_read_unichar(0);
+					if (c != '{') {
+						croak("Missing braces on \\N{}");
+					}
+
+					name = sv_2mortal(newSVpvs(""));
+					if (lex_bufutf8()) {
+						SvUTF8_on(name);
+					}
+
+					while ((c = lex_read_unichar(0)) != '}') {
+						if (c == -1) {
+							croak("Missing right brace on \\N{}");
+						}
+						my_sv_cat_c(aTHX_ name, c);
+					}
+
+					n_ptr = SvPV(name, n_len);
+
+					if (n_len >= 2 && n_ptr[0] == 'U' && n_ptr[1] == '+') {
+						I32 flags = PERL_SCAN_ALLOW_UNDERSCORES | PERL_SCAN_DISALLOW_PREFIX;
+						STRLEN x_len;
+
+						n_ptr += 2;
+						n_len -= 2;
+
+						x_len = n_len;
+						c = grok_hex(n_ptr, &x_len, &flags, NULL);
+						if (x_len == 0 || x_len != n_len) {
+							croak("Invalid hexadecimal number in \\N{U+...}");
+						}
+
+						break;
+					}
+
+					{
+						HV *table;
+						SV **cvp;
+
+						#if HAVE_PERL_VERSION(5, 15, 7)
+							if (
+								!(table = GvHV(PL_hintgv)) ||
+								!(PL_hints & HINT_LOCALIZE_HH) ||
+								!(cvp = hv_fetchs(table, "charnames", FALSE)) ||
+								!SvOK(*cvp)
+							) {
+								load_module(
+									0, newSVpvs("charnames"), NULL,
+									newSVpvs(":full"), newSVpvs(":short"), (SV *)NULL
+								);
+							}
+						#endif
+
+						if (
+							!(table = GvHV(PL_hintgv)) ||
+							!(PL_hints & HINT_LOCALIZE_HH)
+						) {
+							/* ??? */
+							croak("Constant(\\N{%"SVf"} unknown", SVfARG(name));
+						}
+
+						if (
+							!(cvp = hv_fetchs(table, "charnames", FALSE)) ||
+							!SvOK(*cvp)
+						) {
+							croak("Unknown charname '%"SVf"'", SVfARG(name));
+						}
+
+						{
+							SV *r, *cv = *cvp;
+							dSP;
+
+							PUSHSTACKi(PERLSI_OVERLOAD);
+							ENTER;
+							SAVETMPS;
+
+							PUSHMARK(SP);
+							EXTEND(SP, 1);
+							PUSHs(name);
+							PUTBACK;
+
+							call_sv(cv, G_SCALAR);
+							SPAGAIN;
+
+							r = POPs;
+							SvREFCNT_inc_simple_void_NN(r);
+
+							PUTBACK;
+							FREETMPS;
+							LEAVE;
+							POPSTACK;
+
+							if (!SvOK(r)) {
+								SvREFCNT_dec(r);
+								croak("Unknown charname '%"SVf"'", SVfARG(name));
+							}
+
+							sv_catsv(sv, r);
+							SvREFCNT_dec(r);
+							continue;
+						}
+					}
+
+					break;
+				}
+
 				default:
 					if (c >= '0' && c <= '7') {
 						u = c - '0';
@@ -449,7 +559,7 @@ static int qc_enabled(pTHX_ const char *hk_ptr, size_t hk_len) {
 	sv = *psv;
 	return SvTRUE(sv);
 }
-#define qc_enableds(S) qc_enabled(aTHX_ "" S "", sizeof (S) - 1)
+#define qc_enableds(S) qc_enabled(aTHX_ STR_WITH_LEN(S))
 
 static int my_keyword_plugin(pTHX_ char *keyword_ptr, STRLEN keyword_len, OP **op_ptr) {
 	int ret;

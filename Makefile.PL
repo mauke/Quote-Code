@@ -24,7 +24,10 @@ my %opt = (
 	},
 	BUILD_REQUIRES => {},
 	TEST_REQUIRES => {
+		'charnames' => 0,
+		'if' => 0,
 		'strict' => 0,
+		'utf8' => 0,
 		'Test::More' => 0,
 	},
 	PREREQ_PM => {

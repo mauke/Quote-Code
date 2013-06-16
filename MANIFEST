@@ -11,4 +11,6 @@ t/03-context.t
 t/04-heredoc.t
 t/05-heredoc-code.t
 t/06-heredoc-code.t
+t/07-charnames.t
+t/08-utf8.t
 t/pod.t
