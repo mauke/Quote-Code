@@ -1,19 +1,18 @@
 package Quote::Code;
 
 use v5.14.0;
-
 use warnings;
 
 use Carp qw(croak);
 
 use XSLoader;
 BEGIN {
-	our $VERSION = '0.03';
+	our $VERSION = '1.00';
 	XSLoader::load;
 }
 
 my %export = (
-	qc => HINTK_QC,
+	qc    => HINTK_QC,
 	qc_to => HINTK_QC_TO,
 );
 
@@ -128,7 +127,7 @@ Lukas Mai, C<< <l.mai at web.de> >>
 
 =head1 COPYRIGHT & LICENSE
 
-Copyright 2012 Lukas Mai.
+Copyright 2012-2013 Lukas Mai.
 
 This program is free software; you can redistribute it and/or modify it
 under the terms of either: the GNU General Public License as published

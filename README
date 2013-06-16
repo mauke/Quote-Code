@@ -30,13 +30,13 @@ You can also look for information at:
     CPAN Ratings
         http://cpanratings.perl.org/d/Quote-Code
 
-    Search CPAN
-        http://search.cpan.org/dist/Quote-Code/
+    MetaCPAN
+        https://metacpan.org/module/Quote::Code
 
 
 COPYRIGHT AND LICENCE
 
-Written by Lukas Mai, 2012.
+Written by Lukas Mai, 2012-2013.
 
 This program is free software; you can redistribute it and/or modify it
 under the terms of either: the GNU General Public License as published
