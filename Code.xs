@@ -454,19 +454,19 @@ static int qc_enabled(pTHX_ const char *hk_ptr, size_t hk_len) {
 static int my_keyword_plugin(pTHX_ char *keyword_ptr, STRLEN keyword_len, OP **op_ptr) {
 	int ret;
 
-	SAVETMPS;
-
 	if (keyword_len == 2 && keyword_ptr[0] == 'q' && keyword_ptr[1] == 'c' && qc_enableds(HINTK_QC)) {
+		ENTER;
 		parse_qc(aTHX_ op_ptr);
+		LEAVE;
 		ret = KEYWORD_PLUGIN_EXPR;
 	} else if (keyword_len == 5 && memcmp(keyword_ptr, "qc_to", 5) == 0 && qc_enableds(HINTK_QC_TO)) {
+		ENTER;
 		parse_qc_to(aTHX_ op_ptr);
+		LEAVE;
 		ret = KEYWORD_PLUGIN_EXPR;
 	} else {
 		ret = next_keyword_plugin(aTHX_ keyword_ptr, keyword_len, op_ptr);
 	}
-
-	FREETMPS;
 
 	return ret;
 }
