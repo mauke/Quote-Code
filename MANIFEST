@@ -2,6 +2,7 @@ Changes
 lib/Quote/Code.pm
 Makefile.PL
 MANIFEST
+MANIFEST.SKIP
 README
 Code.xs
 t/00-load.t
