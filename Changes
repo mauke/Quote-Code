@@ -1,5 +1,8 @@
 Revision history for Quote-Code
 
+1.01    2013-09-18
+        Implement qcw(...).
+
 1.00    2013-06-16
         Support \N{...}.
 
