@@ -14,6 +14,7 @@ BEGIN {
 my %export = (
 	qc    => HINTK_QC,
 	qc_to => HINTK_QC_TO,
+	qcw   => HINTK_QCW,
 );
 
 sub import {
@@ -62,9 +63,18 @@ Quote::Code - quoted strings with arbitrary code interpolation
  EOT
  print $heredoc;
 
+ my $name = "A B C";
+ my @words = qcw(
+   foo
+   bar\ baz
+   {2 + 2}
+   ({$name})
+ );
+ # @words = ("foo", "bar baz", "4", "(A B C)");
+
 =head1 DESCRIPTION
 
-This module provides the new keywords C<qc> and C<qc_to>.
+This module provides the new keywords C<qc>, C<qc_to> and C<qcw>.
 
 =head2 qc
 
@@ -120,6 +130,31 @@ escape C<#{> by writing either C<\#{> or C<#\{>.
 =back
 
 Variables aren't interpolated in either case.
+
+=head2 qcw
+
+C<qcw> is analogous to L<C<qw>|perlop/qw/STRING/>. It quotes a list of strings
+with code interpolation (C<{ ... }>) like C<qc>.
+
+Differences between C<qcw> and C<qw>:
+
+=over
+
+=item *
+
+C<{ ... }> sequences are interpreted as expressions to be interpolated in the
+current word. The result of C<{ ... }> is not scanned for spaces or split.
+
+=item *
+
+Backslash escape sequences such as C<\n>, C<\xff>, C<\cA> etc. are recognized.
+
+=item *
+
+Spaces can be escaped with a backslash to prevent word splitting:
+C<qcw(a b\ c d)> is equivalent to C<('a', 'b c', 'd')>.
+
+=back
 
 =head1 AUTHOR
 

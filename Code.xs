@@ -1,5 +1,5 @@
 /*
-Copyright 2012 Lukas Mai.
+Copyright 2012, 2013 Lukas Mai.
 
 This program is free software; you can redistribute it and/or modify it
 under the terms of either: the GNU General Public License as published
@@ -69,6 +69,7 @@ WARNINGS_ENABLE
 
 #define HINTK_QC     MY_PKG "/qc"
 #define HINTK_QC_TO  MY_PKG "/qc_to"
+#define HINTK_QCW    MY_PKG "/qcw"
 
 static int (*next_keyword_plugin)(pTHX_ char *, STRLEN, OP **);
 
@@ -78,10 +79,16 @@ static void free_ptr_op(pTHX_ void *vp) {
 	Safefree(pp);
 }
 
+enum {
+	FLAG_BACKSLASH_ESCAPE = 0x1,
+	FLAG_HASH_INTERPOLATE = 0x2,
+	FLAG_STOP_AT_SPACE    = 0x4
+};
+
 typedef struct {
 	I32 delim_start, delim_stop;
 	SV *delim_str, *leftover;
-	int backslash_escape, hash_interpolate;
+	int flags;
 } QCSpec;
 
 static void missing_terminator(pTHX_ const QCSpec *spec, line_t line) {
@@ -131,22 +138,19 @@ static void my_op_cat_sv(pTHX_ OP **pop, SV *sv) {
 	*pop = !*pop ? str : newBINOP(OP_CONCAT, 0, *pop, str);
 }
 
-static OP *parse_qctail(pTHX_ const QCSpec *spec) {
+static OP *parse_qctail(pTHX_ const QCSpec *spec, int *pnesting) {
 	I32 c;
 	OP **gen_sentinel;
 	SV *sv;
-	int nesting;
 	line_t start;
 	SV *const delim_str = spec->delim_str;
 	const int
 		have_delim_stop = spec->delim_stop != -1;
 
-	assert(have_delim_stop != !!delim_str);
+	assert(have_delim_stop == !delim_str);
 	assert(!delim_str || spec->leftover);
 
 	start = CopLINE(PL_curcop);
-
-	nesting = have_delim_stop && spec->delim_start != spec->delim_stop ? 0 : -1;
 
 	Newx(gen_sentinel, 1, OP *);
 	*gen_sentinel = NULL;
@@ -193,7 +197,7 @@ static OP *parse_qctail(pTHX_ const QCSpec *spec) {
 		}
 
 		if (
-			!spec->hash_interpolate
+			!(spec->flags & FLAG_HASH_INTERPOLATE)
 				? c == '{'
 				: c == '#' &&
 				  spec->delim_stop != '#' &&
@@ -226,14 +230,21 @@ static OP *parse_qctail(pTHX_ const QCSpec *spec) {
 
 		lex_read_unichar(0);
 
-		if (nesting != -1 && c == spec->delim_start) {
-			nesting++;
+		if (pnesting && c == spec->delim_start) {
+			(*pnesting)++;
 		} else if (have_delim_stop && c == spec->delim_stop) {
-			if (nesting == -1 || nesting == 0) {
+			if (!pnesting || *pnesting == 0) {
+				if (spec->flags & FLAG_STOP_AT_SPACE) {
+					/* terrible hack to let qcw() know to stop parsing */
+					char tmp = c;
+					lex_stuff_pvn(&tmp, 1, 0);
+				}
 				break;
 			}
-			nesting--;
-		} else if (c == '\\' && spec->backslash_escape) {
+			(*pnesting)--;
+		} else if ((spec->flags & FLAG_STOP_AT_SPACE) && isSPACE(c)) {
+			break;
+		} else if (c == '\\' && (spec->flags & FLAG_BACKSLASH_ESCAPE)) {
 			U32 u;
 
 			c = lex_read_unichar(0);
@@ -477,13 +488,72 @@ static void parse_qc(pTHX_ OP **op_ptr) {
 			c == '<' ? '>' :
 			c
 		;
+		int nesting = 0;
 		const QCSpec spec = {
 			delim_start, delim_stop,
 			NULL, NULL,
-			1, 0
+			FLAG_BACKSLASH_ESCAPE
 		};
 
-		*op_ptr = parse_qctail(aTHX_ &spec);
+		*op_ptr = parse_qctail(aTHX_ &spec, delim_start == delim_stop ? NULL : &nesting);
+	}
+}
+
+static void parse_qcw(pTHX_ OP **op_ptr) {
+	I32 c;
+
+	c = lex_peek_unichar(0);
+
+	if (c != '#') {
+		lex_read_space(0);
+		c = lex_peek_unichar(0);
+		if (c == -1) {
+			croak("Unexpected EOF after qcw");
+		}
+	}
+	lex_read_unichar(0);
+
+	{
+		I32 delim_start = c;
+		I32 delim_stop =
+			c == '(' ? ')' :
+			c == '[' ? ']' :
+			c == '{' ? '}' :
+			c == '<' ? '>' :
+			c
+		;
+		int nesting = 0;
+		const QCSpec spec = {
+			delim_start, delim_stop,
+			NULL, NULL,
+			FLAG_BACKSLASH_ESCAPE | FLAG_STOP_AT_SPACE
+		};
+		OP **gen_sentinel;
+
+		Newx(gen_sentinel, 1, OP *);
+		*gen_sentinel = NULL;
+		SAVEDESTRUCTOR_X(free_ptr_op, gen_sentinel);
+
+		for (;;) {
+			OP *cur;
+			while (c = lex_peek_unichar(0), c != -1 && isSPACE(c)) {
+				lex_read_unichar(0);
+			}
+			if (c == delim_stop && nesting == 0) {
+				lex_read_unichar(0);
+				break;
+			}
+			cur = parse_qctail(aTHX_ &spec, delim_start == delim_stop ? NULL : &nesting);
+			*gen_sentinel = op_append_elem(OP_LIST, *gen_sentinel, cur);
+		}
+
+		if (*gen_sentinel) {
+			*op_ptr = *gen_sentinel;
+			*gen_sentinel = NULL;
+		} else {
+			*op_ptr = newNULLLIST();
+		}
+		(*op_ptr)->op_flags |= OPf_PARENS;
 	}
 }
 
@@ -540,9 +610,9 @@ static void parse_qc_to(pTHX_ OP **op_ptr) {
 		const QCSpec spec = {
 			-1, -1,
 			delim, leftover,
-			qdelim == '"', 1
+			FLAG_HASH_INTERPOLATE | (qdelim == '"' ? FLAG_BACKSLASH_ESCAPE : 0)
 		};
-		*op_ptr = parse_qctail(aTHX_ &spec);
+		*op_ptr = parse_qctail(aTHX_ &spec, NULL);
 	}
 }
 
@@ -574,6 +644,11 @@ static int my_keyword_plugin(pTHX_ char *keyword_ptr, STRLEN keyword_len, OP **o
 		parse_qc_to(aTHX_ op_ptr);
 		LEAVE;
 		ret = KEYWORD_PLUGIN_EXPR;
+	} else if (keyword_len == 3 && memcmp(keyword_ptr, "qcw", 3) == 0 && qc_enableds(HINTK_QCW)) {
+		ENTER;
+		parse_qcw(aTHX_ op_ptr);
+		LEAVE;
+		ret = KEYWORD_PLUGIN_EXPR;
 	} else {
 		ret = next_keyword_plugin(aTHX_ keyword_ptr, keyword_len, op_ptr);
 	}
@@ -591,8 +666,9 @@ BOOT:
 WARNINGS_ENABLE {
 	HV *const stash = gv_stashpvs(MY_PKG, GV_ADD);
 	/**/
-	newCONSTSUB(stash, "HINTK_QC", newSVpvs(HINTK_QC));
+	newCONSTSUB(stash, "HINTK_QC",    newSVpvs(HINTK_QC));
 	newCONSTSUB(stash, "HINTK_QC_TO", newSVpvs(HINTK_QC_TO));
+	newCONSTSUB(stash, "HINTK_QCW",   newSVpvs(HINTK_QCW));
 	/**/
 	next_keyword_plugin = PL_keyword_plugin;
 	PL_keyword_plugin = my_keyword_plugin;
