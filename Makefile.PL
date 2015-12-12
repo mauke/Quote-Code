@@ -36,11 +36,13 @@ my %opt = (
         'warnings' => 0,
     },
 
+    test  => { TESTS    => join(' ', map 't' . '/*' x $_ . '.t', 1 .. 4) },
     dist  => { COMPRESS => 'gzip -9f', SUFFIX => 'gz', },
     clean => { FILES => 'Quote-Code-*' },
 
     META_MERGE => {
         'meta-spec' => { version => 2 },
+        dynamic_config => 0,
         resources => {
             repository => {
                 url => 'git://github.com/mauke/Quote-Code.git',
@@ -50,6 +52,8 @@ my %opt = (
         },
     },
 );
+
+(do 'maint/eumm-fixup.pl' || die $@ || $!)->(\%opt) if !-f 'META.yml';
 
 (my $mm_version = ExtUtils::MakeMaker->VERSION) =~ tr/_//d;
 
