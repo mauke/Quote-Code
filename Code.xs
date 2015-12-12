@@ -34,7 +34,7 @@ See http://dev.perl.org/licenses/ for more information.
     WARNINGS_ENABLEW(-Wall) \
     WARNINGS_ENABLEW(-Wextra) \
     WARNINGS_ENABLEW(-Wundef) \
-    /* WARNINGS_ENABLEW(-Wshadow) :-( */ \
+    WARNINGS_ENABLEW(-Wshadow) \
     WARNINGS_ENABLEW(-Wbad-function-cast) \
     WARNINGS_ENABLEW(-Wcast-align) \
     WARNINGS_ENABLEW(-Wwrite-strings) \
@@ -394,26 +394,28 @@ static OP *parse_qctail(pTHX_ const QCSpec *spec, int *pnesting) {
 
                         {
                             SV *r, *cv = *cvp;
-                            dSP;
+                            {
+                                dSP;
 
-                            PUSHSTACKi(PERLSI_OVERLOAD);
-                            ENTER;
-                            SAVETMPS;
+                                PUSHSTACKi(PERLSI_OVERLOAD);
+                                ENTER;
+                                SAVETMPS;
 
-                            PUSHMARK(SP);
-                            EXTEND(SP, 1);
-                            PUSHs(name);
-                            PUTBACK;
+                                PUSHMARK(SP);
+                                EXTEND(SP, 1);
+                                PUSHs(name);
+                                PUTBACK;
 
-                            call_sv(cv, G_SCALAR);
-                            SPAGAIN;
+                                call_sv(cv, G_SCALAR);
+                                SPAGAIN;
 
-                            r = POPs;
-                            SvREFCNT_inc_simple_void_NN(r);
+                                r = POPs;
+                                SvREFCNT_inc_simple_void_NN(r);
 
-                            PUTBACK;
-                            FREETMPS;
-                            LEAVE;
+                                PUTBACK;
+                                FREETMPS;
+                                LEAVE;
+                            }
                             POPSTACK;
 
                             if (!SvOK(r)) {
