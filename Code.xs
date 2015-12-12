@@ -29,7 +29,7 @@ See http://dev.perl.org/licenses/ for more information.
 
 #ifdef DEVEL
  #define WARNINGS_RESET PRAGMA_GCC(diagnostic pop)
- #define WARNINGS_ENABLEW(X) PRAGMA_GCC(diagnostic warning #X)
+ #define WARNINGS_ENABLEW(X) PRAGMA_GCC(diagnostic error #X)
  #define WARNINGS_ENABLE \
     WARNINGS_ENABLEW(-Wall) \
     WARNINGS_ENABLEW(-Wextra) \
