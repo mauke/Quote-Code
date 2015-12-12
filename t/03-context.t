@@ -6,9 +6,9 @@ use Test::More tests => 4;
 use Quote::Code;
 
 sub context {
-	!defined wantarray ? 'void' :
-	wantarray ? 'list' :
-	'scalar'
+    !defined wantarray ? 'void' :
+    wantarray ? 'list' :
+    'scalar'
 }
 
 is +(context)[0], 'list';

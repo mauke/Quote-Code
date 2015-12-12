@@ -9,8 +9,8 @@ is eval('qc]1]'), undef;
 like $@, qr/Number found where operator/;
 
 {
-	use Quote::Code;
-	is qc]1], '1';
+    use Quote::Code;
+    is qc]1], '1';
 }
 
 is eval('qc]1]'), undef;
@@ -20,9 +20,9 @@ use Quote::Code;
 is qc]1], '1';
 
 {
-	no Quote::Code;
-	is eval('qc]1]'), undef;
-	like $@, qr/Number found where operator/;
+    no Quote::Code;
+    is eval('qc]1]'), undef;
+    like $@, qr/Number found where operator/;
 }
 
 is qc]1], '1';

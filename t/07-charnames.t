@@ -15,9 +15,9 @@ is qc{\N{LATIN SMALL LETTER E WITH ACUTE}\t\N{GREEK SMALL LETTER XI}\}},
    qq{\N{LATIN SMALL LETTER E WITH ACUTE}\t\N{GREEK SMALL LETTER XI}\}};
 
 if ($^V lt v5.17.6) {
-	is eval 'qc~abc \N{mTfNpY}~', eval 'qq~abc \N{mTfNpY}~';
-	is eval 'qc~\N{mTfNpY}~', "\x{FFFD}";
+    is eval 'qc~abc \N{mTfNpY}~', eval 'qq~abc \N{mTfNpY}~';
+    is eval 'qc~\N{mTfNpY}~', "\x{FFFD}";
 } else {
-	is eval 'qc~abc \N{mTfNpY}~', undef;
-	like $@, qr/Unknown charname 'mTfNpY'/;
+    is eval 'qc~abc \N{mTfNpY}~', undef;
+    like $@, qr/Unknown charname 'mTfNpY'/;
 }

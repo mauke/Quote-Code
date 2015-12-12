@@ -7,37 +7,37 @@ use Carp qw(croak);
 
 use XSLoader;
 BEGIN {
-	our $VERSION = '1.01';
-	XSLoader::load;
+    our $VERSION = '1.01';
+    XSLoader::load;
 }
 
 my %export = (
-	qc    => HINTK_QC,
-	qc_to => HINTK_QC_TO,
-	qcw   => HINTK_QCW,
+    qc    => HINTK_QC,
+    qc_to => HINTK_QC_TO,
+    qcw   => HINTK_QCW,
 );
 
 sub import {
-	my $class = shift;
+    my $class = shift;
 
-	my @todo;
-	for my $item (@_) {
-		push @todo, $export{$item} || croak qq{"$item" is not exported by the $class module};
-	}
-	for my $item (@todo ? @todo : values %export) {
-		$^H{$item} = 1;
-	}
+    my @todo;
+    for my $item (@_) {
+        push @todo, $export{$item} || croak qq{"$item" is not exported by the $class module};
+    }
+    for my $item (@todo ? @todo : values %export) {
+        $^H{$item} = 1;
+    }
 }
 
 sub unimport {
-	my $class = shift;
-	my @todo;
-	for my $item (@_) {
-		push @todo, $export{$item} || croak qq{"$item" is not exported by the $class module};
-	}
-	for my $item (@todo ? @todo : values %export) {
-		delete $^H{$item};
-	}
+    my $class = shift;
+    my @todo;
+    for my $item (@_) {
+        push @todo, $export{$item} || croak qq{"$item" is not exported by the $class module};
+    }
+    for my $item (@todo ? @todo : values %export) {
+        delete $^H{$item};
+    }
 }
 
 'ok'
