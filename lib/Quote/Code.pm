@@ -78,14 +78,14 @@ This module provides the new keywords C<qc>, C<qc_to> and C<qcw>.
 
 =head2 qc
 
-C<qc> is a quoting operator like L<q or qq|perlop/Quote-and-Quote-like-Operators>.
+C<qc> is a quoting operator like L<q or qq|perlop/Quote and Quote-like Operators>.
 It works like C<q> in that it doesn't interpolate C<$foo> or C<@foo>, but like
 C<qq> in that it recognizes backslash escapes such as C<\n>, C<\xff>,
 C<\N{EURO SIGN}>, etc.
 
 What it adds is the ability to embed arbitrary expressions in braces
 (C<{...}>). This is both more readable and more efficient than the old C<"foo
-@{[bar]}"> L<trick|perlfaq4/How-do-I-expand-function-calls-in-a-string->. All
+@{[bar]}"> L<trick|perlfaq4/How do I expand function calls in a string?>. All
 embedded code runs in scalar context.
 
 If you need a literal C<{> in a C<qc> string, you can escape it with a backslash
@@ -94,7 +94,7 @@ If you need a literal C<{> in a C<qc> string, you can escape it with a backslash
 =head2 qc_to
 
 For longer strings you can use C<qc_to>, which provides a
-L<heredoc-like|perlop/EOF> syntax. The main difference between C<qc> and
+L<heredoc-like|perlop/<<I<EOF>> syntax. The main difference between C<qc> and
 C<qc_to> is that C<qc_to> uses the Ruby-like C<#{ ... }> to interpolate code
 (not C<{ ... }>). This is because C<{ }> are more common in longer texts and
 escaping them gets annoying.
@@ -133,8 +133,8 @@ Variables aren't interpolated in either case.
 
 =head2 qcw
 
-C<qcw> is analogous to L<C<qw>|perlop/qw/STRING/>. It quotes a list of strings
-with code interpolation (C<{ ... }>) like C<qc>.
+C<qcw> is analogous to L<C<qw>|perlop/C<qw/I<STRING>/>>. It quotes a list of
+strings with code interpolation (C<{ ... }>) like C<qc>.
 
 Differences between C<qcw> and C<qw>:
 
