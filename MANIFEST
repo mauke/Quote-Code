@@ -1,6 +1,7 @@
 Changes
 lib/Quote/Code.pm
 Makefile.PL
+Makefile_PL_settings
 MANIFEST
 MANIFEST.SKIP
 README
