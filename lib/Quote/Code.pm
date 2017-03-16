@@ -156,6 +156,49 @@ C<qcw(a b\ c d)> is equivalent to C<('a', 'b c', 'd')>.
 
 =back
 
+=head2 Backslash escape sequences
+
+C<qc>, C<qcw>, and C<<< qc_to <<"..." >>> support the following backslash
+escape sequences:
+
+ \\         backslash
+ \a         alarm/bell       (BEL)
+ \b         backspace        (BS)
+ \e         escape           (ESC)
+ \f         form feed        (FF)
+ \n         newline          (LF)
+ \r         carriage return  (CR)
+ \t         tab              (HT)
+
+ \cX        control-X
+            X can be any character from the set
+              ?, @, a-z, A-Z, [, \, ], ^, _
+
+ \o{FOO}    the character whose octal code is FOO
+ \FOO       the character whose octal code is FOO
+            (where FOO is at most 3 octal digits long)
+
+ \x{FOO}    the character whose hexadecimal code is FOO
+ \xFOO      the character whose hexadecimal code is FOO
+            (where FOO is at most 2 hexadecimal digits long)
+ \x         a NUL byte (if \x is not followed by '{' or a hex digit)
+            (don't use this, it might go away in a future release)
+
+ \N{U+FOO}  the character whose hexadecimal code is FOO
+ \N{FOO}    the character whose Unicode name is FOO
+            (as determined by the charnames pragma)
+
+Any other backslashed character (including delimiters) is taken literally. In
+particular this means e.g. both C<qc!a\!b!> and C<qc(a\!b)> represent the
+three-character string C<"a!b">.
+
+The following are explicitly B<not supported>: C<\Q>, C<\L>, C<\l>, C<\U>,
+C<\u>, C<\F>, C<\E>.
+
+Starting with perl v5.16, if you specify a named Unicode character with
+C<\N{...}> and L<C<charnames>|charnames> hasn't been loaded yet, it is
+automatically loaded as if by C<use charnames ':full', ':short';>.
+
 =head1 AUTHOR
 
 Lukas Mai, C<< <l.mai at web.de> >>
