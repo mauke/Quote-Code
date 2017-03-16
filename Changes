@@ -1,5 +1,9 @@
 Revision history for Quote-Code
 
+1.0102  2017-03-16
+        Explicitly document supported escape sequences.
+        Update internal build/test infrastructure.
+
 1.0101  2015-12-16
         Clean up and fix L<...> links in POD.
         Update internal build/test infrastructure.
