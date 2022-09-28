@@ -259,6 +259,7 @@ static OP *parse_qctail(pTHX_ const QCSpec *spec, int *pnesting) {
             switch (c) {
                 case -1:
                     missing_terminator(aTHX_ spec, start);
+                    break;
 
                 case 'a': c = '\a'; break;
                 case 'b': c = '\b'; break;
