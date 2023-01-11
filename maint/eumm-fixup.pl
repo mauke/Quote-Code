@@ -122,6 +122,7 @@ multitest :
 __EOT__
     $multitest =~ s/<PERL_PATTERN>/$perl_pattern/g;
     $opt->{postamble}{text} .= $multitest;
+    $opt->{macro}{SHELL} ||= '/bin/bash';
 
     my $maint_distcheck = <<'__EOT__';
 
