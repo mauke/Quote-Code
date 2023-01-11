@@ -41,10 +41,12 @@ __EOT__
             }
 
             {
-                local $ENV{LD_PRELOAD} = 'libasan.so ' . ($ENV{LD_PRELOAD} || '');
+                my $libasan_path = `\Q$Config::Config{cc}\E -print-file-name=libasan.so` || 'libasan.so';
+                chomp $libasan_path;
+                local $ENV{LD_PRELOAD} = $libasan_path . ' ' . ($ENV{LD_PRELOAD} || '');
                 my $out = `"$^X" -e 0 2>&1`;
                 if ($out eq '') {
-                    $preload_libasan = 1;
+                    $preload_libasan = $libasan_path;
                 } else {
                     warn qq{LD_PRELOAD="$ENV{LD_PRELOAD}" "$^X" failed:\n${out}Skipping ...\n};
                 }
@@ -57,8 +59,8 @@ OTHERLDFLAGS += @otherldflags
 __EOT__
 
         if ($preload_libasan) {
-            $opt->{postamble}{text} .= <<'__EOT__';
-FULLPERLRUN := LD_PRELOAD="libasan.so $$LD_PRELOAD" $(FULLPERLRUN)
+            $opt->{postamble}{text} .= <<"__EOT__";
+FULLPERLRUN := LD_PRELOAD="$preload_libasan \$\$LD_PRELOAD" \$(FULLPERLRUN)
 __EOT__
         }
     }
