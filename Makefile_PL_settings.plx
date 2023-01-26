@@ -21,6 +21,9 @@ return {
         'XSLoader' => 0,
         'warnings' => 0,
     },
+    DEVELOP_REQUIRES => {
+        'Test::Pod' => 1.22,
+    },
 
     REPOSITORY => [ github => 'mauke' ],
 };
