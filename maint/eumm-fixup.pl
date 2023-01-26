@@ -27,7 +27,7 @@ __EOT__
         my @ccflags;
         my @otherldflags;
 
-        if (-e '/dev/null') {
+        if ($^O eq 'linux') {
             {
                 my $libasan_path = `\Q$Config::Config{cc}\E -print-file-name=libasan.so` || 'libasan.so';
                 chomp $libasan_path;
