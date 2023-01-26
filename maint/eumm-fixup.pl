@@ -28,28 +28,28 @@ __EOT__
         my @otherldflags;
 
         if (-e '/dev/null') {
+            {
+                my $libasan_path = `\Q$Config::Config{cc}\E -print-file-name=libasan.so` || 'libasan.so';
+                chomp $libasan_path;
+                local $ENV{LD_PRELOAD} = $libasan_path . ' ' . ($ENV{LD_PRELOAD} || '');
+                my $out = `"$^X" -e 0 2>&1`;
+                if ($? == 0 && $out eq '') {
+                    $preload_libasan = $libasan_path;
+                } else {
+                    warn qq{LD_PRELOAD="$ENV{LD_PRELOAD}" "$^X" failed:\n${out}Skipping ...\n};
+                }
+            }
+
             my $good_cc_flag = sub {
                 system("echo 'int main(void) { return 0; }' | \Q$Config::Config{cc}\E @_ -xc - -o /dev/null") == 0
             };
-            for my $flag (qw(-fsanitize=address -fsanitize=undefined)) {
+            for my $flag ($preload_libasan ? '-fsanitize=address' : (), '-fsanitize=undefined') {
                 if (!$good_cc_flag->($flag)) {
                     warn "!! Your C compiler ($Config::Config{cc}) doesn't seem to support '$flag'. Skipping ...\n";
                     next;
                 }
                 push @ccflags,      $flag;
                 push @otherldflags, $flag;
-            }
-
-            {
-                my $libasan_path = `\Q$Config::Config{cc}\E -print-file-name=libasan.so` || 'libasan.so';
-                chomp $libasan_path;
-                local $ENV{LD_PRELOAD} = $libasan_path . ' ' . ($ENV{LD_PRELOAD} || '');
-                my $out = `"$^X" -e 0 2>&1`;
-                if ($out eq '') {
-                    $preload_libasan = $libasan_path;
-                } else {
-                    warn qq{LD_PRELOAD="$ENV{LD_PRELOAD}" "$^X" failed:\n${out}Skipping ...\n};
-                }
             }
         }
 
@@ -59,8 +59,14 @@ OTHERLDFLAGS += @otherldflags
 __EOT__
 
         if ($preload_libasan) {
+            my $extra_options = '';
+            if ($^V lt v5.22.0) {
+                # Hack. ASan reports a memory leak on 5.14 .. 5.20, but I don't
+                # want integration tests to fail for now.
+                $extra_options = "LSAN_OPTIONS='exitcode=0'";
+            }
             $opt->{postamble}{text} .= <<"__EOT__";
-FULLPERLRUN := LD_PRELOAD="$preload_libasan \$\$LD_PRELOAD" \$(FULLPERLRUN)
+FULLPERLRUN := $extra_options LD_PRELOAD="$preload_libasan \$\$LD_PRELOAD" \$(FULLPERLRUN)
 __EOT__
         }
     }
@@ -130,6 +136,30 @@ distcheck : maint_distcheck
 .PHONY: maint_distcheck
 maint_distcheck :
 	$(PERLRUN) maint/distcheck.pl '$(VERSION)' '$(TO_INST_PM)'
+
+create_distdir : distcheck
 __EOT__
     $opt->{postamble}{text} .= $maint_distcheck;
+
+    my $readme = <<'__EOT__';
+
+pure_all :: .github/README.md
+
+.github/README.md : lib/$(subst ::,/,$(NAME)).pm maint/pod2markdown.pl
+	mkdir -p .github
+	$(PERLRUN) maint/pod2markdown.pl < '$<' > '$@.~tmp~' && $(MV) -- '$@.~tmp~' '$@'
+
+distdir : $(DISTVNAME)/README
+
+$(DISTVNAME)/README : lib/$(subst ::,/,$(NAME)).pm create_distdir
+	$(TEST_F) '$@' || ( $(PERLRUN) maint/pod2readme.pl < '$<' > '$@.~tmp~' && $(MV) -- '$@.~tmp~' '$@' && cd '$(DISTVNAME)' && $(PERLRUN) -MExtUtils::Manifest=maniadd -e 'maniadd { "README" => "generated from $(NAME) POD (added by maint/eumm-fixup.pl)" }' )
+
+__EOT__
+    $opt->{postamble}{text} .= $readme;
+    for ($opt->{META_MERGE}{prereqs}{develop}{requires}{'Pod::Markdown'}) {
+        $_ = '3.005' if !$_ || $_ < '3.005';
+    }
+    for ($opt->{META_MERGE}{prereqs}{develop}{requires}{'Pod::Text'}) {
+        $_ = '4.09'  if !$_ || $_ < '4.09';
+    }
 }

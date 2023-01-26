@@ -13,22 +13,23 @@ my @modules = split ' ', shift @ARGV;
 
 my @errors;
 
-if ($version !~ /_|TRIAL/) {
+my $version_suffix = '';
+if ($version =~ /(-TRIAL[0-9]*)\z/) {
+    $version_suffix = $1;
+} elsif ($version !~ /_/) {
     my $file = 'Changes';
     my $contents = slurp $file;
 
     $contents =~ m{
-        \n
-        \n
+        (?:
+            \A \n?
+        |
+            \n \n
+        )
         \Q$version\E \s+ \d{4}-\d{2}-\d{2} \n
         [^\n\w]* \w
     }x or push @errors, "$file doesn't seem to contain an entry for $version";
 }
-
-my $version_re =
-    $version =~ /^\d+(?:\.\d+)?\z/
-        ? qr{ \Q$version\E | '\Q$version\E' }x
-        : qr{ '\Q$version\E' }x;
 
 for my $module (@modules) {
     my $contents = slurp $module;
@@ -47,7 +48,7 @@ for my $module (@modules) {
     };
     my $v = $+;
 
-    $v eq $version
+    $v eq $version || "$v$version_suffix" eq $version
         or push @errors, "$module version '$v' doesn't match distribution version '$version'";
 }
 

@@ -22,5 +22,5 @@ return {
         'warnings' => 0,
     },
 
-    bonus => { github => 'mauke' },
+    REPOSITORY => [ github => 'mauke' ],
 };
